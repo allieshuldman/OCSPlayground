@@ -1,50 +1,36 @@
 {
   "name": "ocsplayground",
+  "productName": "OCS Playground",
   "private": true,
   "version": "0.0.0",
-  "main": "electron/main.js",
+  "main": ".vite/build/electron-main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron": "electron .",
-    "electron:dev": "NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder",
-    "electron:pack": "npm run build && electron-builder --dir"
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "dependencies": {
     "@azure/msal-browser": "^3.7.0",
     "@azure/msal-react": "^2.0.11",
     "@uiw/react-json-view": "^2.0.0-alpha.41",
+    "electron-squirrel-startup": "^1.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-dmg": "^7.8.0",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron-forge/plugin-vite": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
     "@vitejs/plugin-react": "^4.2.1",
     "electron": "^28.3.3",
-    "electron-builder": "^24.13.3",
     "vite": "^5.0.8"
-  },
-  "build": {
-    "appId": "com.ocsplayground.app",
-    "productName": "OCS Playground",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "category": "public.app-category.utilities",
-      "target": "dmg"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }

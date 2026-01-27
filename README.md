@@ -31,18 +31,13 @@ npm run dev
 
 **Electron (desktop)**
 
-To run the app in Electron during development:
+To run the app in Electron during development (Electron Forge + Vite):
 
-1. **Terminal 1** — start the Vite dev server:
-   ```bash
-   npm run dev
-   ```
-2. **Terminal 2** — launch Electron:
-   ```bash
-   npm run electron:dev
-   ```
+```bash
+npm run start
+```
 
-Electron loads the app from `http://localhost:62522`, so the dev server must be running first. DevTools open automatically in the Electron window.
+This starts the Vite dev server for the renderer and launches Electron. DevTools open automatically. If port 62522 is in use, Vite will use another port.
 
 **Preview production build locally**
 
@@ -55,7 +50,7 @@ Serves the production build at `http://localhost:4173` (or the URL Vite prints).
 
 **Troubleshooting**
 
-- **Port 62522 already in use:** Stop the process using that port or change `server.port` in `vite.config.js`. The config uses `strictPort: true`, so Vite will exit if the port is taken.
+- **Port 62522 already in use:** For `npm run dev`, change `server.port` in `vite.config.js` or stop the process using it. For `npm run start`, the renderer config will try another port automatically.
 - **Dependencies out of date:** Run `npm install` again and retry.
 
 ### 3. Add Tokens
@@ -67,15 +62,26 @@ Use the **Auth** page to add:
 
 ### 4. Build for Production
 
+**Web only**
+
 ```bash
 npm run build
 ```
 
-For Electron:
+**Electron (Windows & Mac)**
 
-```bash
-npm run electron:build
-```
+The app uses [Electron Forge](https://www.electronforge.io/) with the Vite plugin.
+
+- **Package** (unpacked app):
+  ```bash
+  npm run package
+  ```
+- **Make installers:**
+  ```bash
+  npm run make
+  ```
+  - **Mac:** DMG and ZIP in `out/make/` (run on macOS).
+  - **Windows:** Squirrel installer and ZIP (run on Windows).
 
 ## Features
 
@@ -92,3 +98,7 @@ npm run electron:build
 - `src/Analysis.jsx` — Analysis tools.
 - `src/App.jsx` — Main app and navigation.
 - `src/authConfig.js` — Graph API endpoint configuration.
+- `src/electron-main.js` — Electron main process.
+- `src/preload.js` — Electron preload script.
+- `forge.config.js` — Electron Forge config (Vite plugin, makers).
+- `vite.main.config.mjs` / `vite.preload.config.mjs` / `vite.renderer.config.mjs` — Vite configs for Forge.

@@ -19,6 +19,8 @@ lerna-debug.log*
 # Build output
 dist
 dist-electron
+.vite
+out
 *.local
 
 # Editor directories and files
