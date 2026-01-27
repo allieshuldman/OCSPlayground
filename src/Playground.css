@@ -1827,6 +1827,23 @@
   color: #999;
 }
 
+.placeholder-html-preview {
+  width: 100%;
+  padding: 8px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 14px;
+  min-height: 24px;
+  max-height: 240px;
+  overflow: auto;
+  line-height: 1.5;
+}
+
+.placeholder-html-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
 .regular-placeholders-section {
   margin-bottom: 32px;
 }

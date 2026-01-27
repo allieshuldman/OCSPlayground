@@ -424,6 +424,14 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     return matches
   }
 
+  const isHtml = (str) =>
+    typeof str === 'string' && str.trim().length > 0 && /<[a-z\/][\s\S]*?>/i.test(str)
+
+  const isBodyPlaceholder = (name) => {
+    const n = (name || '').toLowerCase()
+    return n === 'body' || n === 'uniquebody'
+  }
+
   // Regular placeholders (excluding SubTemplate references)
   const allPlaceholders = useMemo(() => extractPlaceholders(templateText), [templateText])
   const subTemplateRefs = useMemo(() => extractSubTemplatePlaceholders(templateText), [templateText])
@@ -2265,23 +2273,34 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                     </tr>
                   </thead>
                   <tbody>
-                    {placeholders.map((placeholder, index) => (
-                      <tr key={index}>
-                        <td className="placeholder-name">{placeholder}</td>
-                        <td className="placeholder-value-cell">
-                          <textarea
-                            className="placeholder-value-input"
-                            value={placeholderValues[placeholder] || ''}
-                            readOnly
-                              rows={1}
-                            placeholder={usedMessage || usedMessageDetails ? `Value for ${placeholder}` : 'Select message to see placeholder value'}
-                              ref={(el) => {
-                                if (el) autoResizeTextareaMaxLines(el, 10)
-                              }}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {placeholders.map((placeholder, index) => {
+                      const value = placeholderValues[placeholder] || ''
+                      const showAsHtml = isBodyPlaceholder(placeholder) && isHtml(value)
+                      return (
+                        <tr key={index}>
+                          <td className="placeholder-name">{placeholder}</td>
+                          <td className="placeholder-value-cell">
+                            {showAsHtml ? (
+                              <div
+                                className="placeholder-value-input placeholder-html-preview"
+                                dangerouslySetInnerHTML={{ __html: value }}
+                              />
+                            ) : (
+                              <textarea
+                                className="placeholder-value-input"
+                                value={value}
+                                readOnly
+                                rows={1}
+                                placeholder={usedMessage || usedMessageDetails ? `Value for ${placeholder}` : 'Select message to see placeholder value'}
+                                ref={(el) => {
+                                  if (el) autoResizeTextareaMaxLines(el, 10)
+                                }}
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2308,22 +2327,30 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                         </thead>
                         <tbody>
                           {subPlaceholders.map((placeholder, index) => {
-                            // Create a unique key for SubTemplate placeholders
                             const fullPlaceholderKey = `${subTemplateName}.${placeholder}`
+                            const value = placeholderValues[fullPlaceholderKey] || ''
+                            const showAsHtml = isBodyPlaceholder(placeholder) && isHtml(value)
                             return (
                               <tr key={index}>
                                 <td className="placeholder-name">{placeholder}</td>
                                 <td className="placeholder-value-cell">
-                                  <textarea
-                                    className="placeholder-value-input"
-                                    value={placeholderValues[fullPlaceholderKey] || ''}
-                                    readOnly
-                                    rows={1}
-                                    placeholder={usedMessage || usedMessageDetails ? `Value for ${placeholder}` : 'Select message to see placeholder value'}
-                                    ref={(el) => {
-                                      if (el) autoResizeTextareaMaxLines(el, 10)
-                                    }}
-                                  />
+                                  {showAsHtml ? (
+                                    <div
+                                      className="placeholder-value-input placeholder-html-preview"
+                                      dangerouslySetInnerHTML={{ __html: value }}
+                                    />
+                                  ) : (
+                                    <textarea
+                                      className="placeholder-value-input"
+                                      value={value}
+                                      readOnly
+                                      rows={1}
+                                      placeholder={usedMessage || usedMessageDetails ? `Value for ${placeholder}` : 'Select message to see placeholder value'}
+                                      ref={(el) => {
+                                        if (el) autoResizeTextareaMaxLines(el, 10)
+                                      }}
+                                    />
+                                  )}
                                 </td>
                               </tr>
                             )
