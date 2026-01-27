@@ -255,7 +255,7 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
       
       // Fetch messages from the specified folder with timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000) // 90 second timeout
       
       try {
         // URL encode the query parameters
@@ -264,13 +264,20 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
           '$orderby': 'receivedDateTime desc',
           '$select': 'id,subject,from,receivedDateTime,isRead,bodyPreview,hasAttachments,conversationId'
         })
-        
+
+        const inboxQueryParams = new URLSearchParams({
+          '$top': '20',
+          '$orderby': 'receivedDateTime desc',
+          '$select': 'id,subject,from,receivedDateTime,isRead,bodyPreview,hasAttachments,conversationId',
+          '$filter': "parentFolderId eq 'inbox'"
+        })
+
         let mailResponse
         
         // For inbox, use the simpler /me/messages endpoint
         // For other folders, use the folder-specific endpoint
         const endpoint = folderId === 'Inbox' 
-          ? `https://graph.microsoft.com/v1.0/me/messages?${queryParams.toString()}`
+          ? `https://graph.microsoft.com/v1.0/me/messages?${inboxQueryParams.toString()}`
           : `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?${queryParams.toString()}`
         
         console.log('Fetching mailbox from:', endpoint)
@@ -346,7 +353,7 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
     setLoadingMoreMessages(true)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 90000) // 90 second timeout
 
     try {
       const response = await fetch(mailboxNextLink, {

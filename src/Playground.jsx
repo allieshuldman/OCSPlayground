@@ -62,6 +62,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   const [objectKey, setObjectKey] = useState('ConversationId')
   const [objectValue, setObjectValue] = useState('')
   const [model, setModel] = useState('')
+  const [stopSequences, setStopSequences] = useState([])
   const [templates, setTemplates] = useState(() => {
     try {
       const stored = localStorage.getItem('playgroundTemplates')
@@ -1116,6 +1117,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       .split('\n')
       .map(line => line + '\n')
 
+    const stopSeqs = stopSequences.map(s => s.trim()).filter(Boolean)
+
     // Build request body with all fields
     const rawRequestBody = {
       CustomScenarioTag: customScenarioTag || 'OCSPlayground', // Required field with default
@@ -1132,7 +1135,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
         ParametersValues: parametersValues,
       },
       modelConfiguration: {
-        model: model,
+        ...(model?.trim() ? { model: model.trim() } : {}),
+        ...(stopSeqs.length > 0 ? { stopSequences: stopSeqs } : {}),
       },
       ...(objectKey === "ConversationId" && objectValue
         ? { ConversationId: objectValue }
@@ -1145,7 +1149,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
 
     // Remove empty fields from the request body
     return removeEmptyFields(rawRequestBody)
-  }, [templateText, subTemplates, conditionFlags, parametersValues, customScenarioTag, model, objectKey, objectValue])
+  }, [templateText, subTemplates, conditionFlags, parametersValues, customScenarioTag, model, stopSequences, objectKey, objectValue])
 
   const handleCallExperimentAPIClicked = async () => {
     if (!ocsToken) {
@@ -2440,6 +2444,47 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                       onChange={(e) => setModel(e.target.value)}
                       placeholder="Enter model name..."
                     />
+                  </div>
+
+                  {/* Stop Sequences */}
+                  <div className="stop-sequences-section">
+                    <div className="stop-sequences-header">
+                      <label className="stop-sequences-label">Stop Sequences (Optional):</label>
+                      <button
+                        type="button"
+                        className="add-stop-sequence-button"
+                        onClick={() => setStopSequences([...stopSequences, ''])}
+                      >
+                        + Add Stop Sequence
+                      </button>
+                    </div>
+                    {stopSequences.length > 0 && (
+                      <div className="stop-sequences-list">
+                        {stopSequences.map((seq, index) => (
+                          <div key={index} className="stop-sequence-item">
+                            <input
+                              type="text"
+                              className="stop-sequence-input"
+                              value={seq}
+                              onChange={(e) => {
+                                const updated = [...stopSequences]
+                                updated[index] = e.target.value
+                                setStopSequences(updated)
+                              }}
+                              placeholder="Enter stop sequence..."
+                            />
+                            <button
+                              type="button"
+                              className="remove-stop-sequence-button"
+                              onClick={() => setStopSequences(stopSequences.filter((_, i) => i !== index))}
+                              title="Remove stop sequence"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Custom Scenario Tag Section */}

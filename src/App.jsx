@@ -127,9 +127,9 @@ function App() {
         />
       )}
 
-      {/* Main Content */}
+      {/* Main Content - all panels always mounted to preserve state when switching tabs */}
       <div className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-        {currentPage === 'auth' && (
+        <div className="tab-panel" style={{ display: currentPage === 'auth' ? 'block' : 'none' }}>
           <Auth 
             bearerToken={bearerToken}
             ocsToken={ocsToken}
@@ -138,8 +138,8 @@ function App() {
             onLogout={handleLogout}
             onOcsTokenClear={handleOcsTokenClear}
           />
-        )}
-        {currentPage === 'graph' && (
+        </div>
+        <div className="tab-panel" style={{ display: currentPage === 'graph' ? 'block' : 'none' }}>
           <Graph 
             bearerToken={bearerToken} 
             onTokenSubmit={handleTokenSubmit} 
@@ -148,8 +148,8 @@ function App() {
             onFavoritesChange={setDashboardFavorites}
             onTokenError={handleLogout}
           />
-        )}
-        {currentPage === 'playground' && (
+        </div>
+        <div className="tab-panel" style={{ display: currentPage === 'playground' ? 'block' : 'none' }}>
           <Playground 
             bearerToken={bearerToken}
             ocsToken={ocsToken}
@@ -157,10 +157,10 @@ function App() {
             dashboardFavorites={dashboardFavorites}
             onOcsTokenError={handleOcsTokenClear}
           />
-        )}
-        {currentPage === 'analysis' && (
+        </div>
+        <div className="tab-panel" style={{ display: currentPage === 'analysis' ? 'block' : 'none' }}>
           <Analysis />
-        )}
+        </div>
       </div>
     </div>
   )
