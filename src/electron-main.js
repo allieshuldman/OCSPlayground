@@ -1,5 +1,6 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, session, ipcMain } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import started from 'electron-squirrel-startup'
 
@@ -7,6 +8,32 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 if (started) {
   app.quit()
+}
+
+const PERSISTENT_PARTITION = 'persist:ocsplayground'
+
+const getStorePath = () => path.join(app.getPath('userData'), 'ocsplayground-store.json')
+
+function readStore() {
+  try {
+    const p = getStorePath()
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, 'utf8')
+      const data = JSON.parse(raw)
+      return typeof data === 'object' && data !== null ? data : {}
+    }
+  } catch (err) {
+    console.error('Error reading store:', err)
+  }
+  return {}
+}
+
+function writeStore(store) {
+  try {
+    fs.writeFileSync(getStorePath(), JSON.stringify(store), 'utf8')
+  } catch (err) {
+    console.error('Error writing store:', err)
+  }
 }
 
 function createWindow() {
@@ -19,6 +46,7 @@ function createWindow() {
       contextIsolation: true,
       enableRemoteModule: false,
       webSecurity: false,
+      partition: PERSISTENT_PARTITION,
     },
   })
 
@@ -35,15 +63,28 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  let inMemoryStore = readStore()
+
+  ipcMain.handle('store-getAll', () => inMemoryStore)
+  ipcMain.handle('store-setItem', (_, key, value) => {
+    inMemoryStore[key] = value == null ? '' : String(value)
+    writeStore(inMemoryStore)
+  })
+  ipcMain.handle('store-removeItem', (_, key) => {
+    delete inMemoryStore[key]
+    writeStore(inMemoryStore)
+  })
+
   const filter = {
     urls: ['https://outlook-sdf.office.com/*', 'https://outlook-sdf.office.com/outlookcopilot/*'],
   }
 
-  session.defaultSession.webRequest.onBeforeRequest(filter, (details, callback) => {
+  const appSession = session.fromPartition(PERSISTENT_PARTITION)
+  appSession.webRequest.onBeforeRequest(filter, (details, callback) => {
     callback({})
   })
 
-  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+  appSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
     callback({
       requestHeaders: {
         ...details.requestHeaders,
@@ -53,7 +94,7 @@ app.whenReady().then(() => {
     })
   })
 
-  session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+  appSession.webRequest.onHeadersReceived(filter, (details, callback) => {
     const responseHeaders = {
       ...details.responseHeaders,
       'Access-Control-Allow-Origin': ['*'],

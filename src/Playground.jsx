@@ -768,7 +768,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
         [fileName]: {
           content: content,
           conditionFlags: [],
-          parametersValues: {}
+          parametersValues: {},
+          stopSequences: []
         }
       }
       saveTemplates(newTemplates)
@@ -776,6 +777,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       setTemplateText(content)
       setConditionFlags([])
       setParametersValues({})
+      setStopSequences([])
       
       // Reset file input
       e.target.value = ''
@@ -789,6 +791,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     setTemplateText('')
     setConditionFlags([])
     setParametersValues({})
+    setStopSequences([])
   }
 
   const handleManualSubTemplateSubmit = (e) => {
@@ -834,10 +837,12 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       setTemplateText(template.content || '')
       setConditionFlags(template.conditionFlags || [])
       setParametersValues(template.parametersValues || {})
+      setStopSequences(template.stopSequences || [])
     } else {
       setTemplateText('')
       setConditionFlags([])
       setParametersValues({})
+      setStopSequences([])
     }
   }
 
@@ -861,7 +866,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       [templateName]: {
         content: templateText.trim(),
         conditionFlags: conditionFlags,
-        parametersValues: parametersValues
+        parametersValues: parametersValues,
+        stopSequences: stopSequences
       }
     }
     saveTemplates(updatedTemplates)
@@ -920,6 +926,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       if (selectedTemplateName === templateName) {
         setSelectedTemplateName('')
         setTemplateText('')
+        setStopSequences([])
       }
     }
   }
@@ -1410,10 +1417,12 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       setTemplateText(template.content || '')
       setConditionFlags(template.conditionFlags || [])
       setParametersValues(template.parametersValues || {})
+      setStopSequences(template.stopSequences || [])
     } else if (!selectedTemplateName) {
       setTemplateText('')
       setConditionFlags([])
       setParametersValues({})
+      setStopSequences([])
     }
   }, [selectedTemplateName, templates])
 
@@ -2106,6 +2115,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                               saveTemplates({})
                               setSelectedTemplateName('')
                               setTemplateText('')
+                              setStopSequences([])
                             }
                           }}
                           title="Delete all templates"
@@ -2261,6 +2271,47 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
               )}
             </div>
 
+            {/* Stop Sequences Section - part of template */}
+            <div className="stop-sequences-section">
+              <div className="stop-sequences-header">
+                <label className="stop-sequences-label">Stop Sequences (Optional):</label>
+                <button
+                  type="button"
+                  className="add-stop-sequence-button"
+                  onClick={() => setStopSequences([...stopSequences, ''])}
+                >
+                  + Add Stop Sequence
+                </button>
+              </div>
+              {stopSequences.length > 0 && (
+                <div className="stop-sequences-list">
+                  {stopSequences.map((seq, index) => (
+                    <div key={index} className="stop-sequence-item">
+                      <input
+                        type="text"
+                        className="stop-sequence-input"
+                        value={seq}
+                        onChange={(e) => {
+                          const updated = [...stopSequences]
+                          updated[index] = e.target.value
+                          setStopSequences(updated)
+                        }}
+                        placeholder="Enter stop sequence..."
+                      />
+                      <button
+                        type="button"
+                        className="remove-stop-sequence-button"
+                        onClick={() => setStopSequences(stopSequences.filter((_, i) => i !== index))}
+                        title="Remove stop sequence"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
               <div className="extracted-placeholders">
               {placeholders.length > 0 ? (
                 <div className="regular-placeholders-section">
@@ -2386,6 +2437,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                       setTemplateText('')
                       setConditionFlags([])
                       setParametersValues({})
+                      setStopSequences([])
                     }}
                   >
                     Cancel
@@ -2471,47 +2523,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                       onChange={(e) => setModel(e.target.value)}
                       placeholder="Enter model name..."
                     />
-                  </div>
-
-                  {/* Stop Sequences */}
-                  <div className="stop-sequences-section">
-                    <div className="stop-sequences-header">
-                      <label className="stop-sequences-label">Stop Sequences (Optional):</label>
-                      <button
-                        type="button"
-                        className="add-stop-sequence-button"
-                        onClick={() => setStopSequences([...stopSequences, ''])}
-                      >
-                        + Add Stop Sequence
-                      </button>
-                    </div>
-                    {stopSequences.length > 0 && (
-                      <div className="stop-sequences-list">
-                        {stopSequences.map((seq, index) => (
-                          <div key={index} className="stop-sequence-item">
-                            <input
-                              type="text"
-                              className="stop-sequence-input"
-                              value={seq}
-                              onChange={(e) => {
-                                const updated = [...stopSequences]
-                                updated[index] = e.target.value
-                                setStopSequences(updated)
-                              }}
-                              placeholder="Enter stop sequence..."
-                            />
-                            <button
-                              type="button"
-                              className="remove-stop-sequence-button"
-                              onClick={() => setStopSequences(stopSequences.filter((_, i) => i !== index))}
-                              title="Remove stop sequence"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   {/* Custom Scenario Tag Section */}

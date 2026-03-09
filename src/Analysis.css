@@ -513,6 +513,43 @@
   margin: 0;
 }
 
+.run-details-two-section .save-details-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.run-completions-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.run-completions-section h4,
+.run-completions-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.run-saved-info-section {
+  margin-top: 8px;
+}
+
+.run-saved-info-section > h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.no-completions-message {
+  color: #666;
+  font-style: italic;
+  margin: 0;
+  padding: 12px 0;
+}
+
 .notes-section {
   background-color: #f9f9f9;
   padding: 16px;

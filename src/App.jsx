@@ -159,7 +159,7 @@ function App() {
           />
         </div>
         <div className="tab-panel" style={{ display: currentPage === 'analysis' ? 'block' : 'none' }}>
-          <Analysis />
+          <Analysis isActive={currentPage === 'analysis'} />
         </div>
       </div>
     </div>

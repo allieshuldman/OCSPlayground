@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import JsonView from '@uiw/react-json-view'
 import './Analysis.css'
 
-function Analysis() {
+function Analysis({ isActive }) {
   const [saves, setSaves] = useState([])
   const [viewMode, setViewMode] = useState('default') // 'default', 'viewAll', 'compareEmails', 'comparePrompts'
   const [selectedSave, setSelectedSave] = useState(null)
@@ -18,17 +18,16 @@ function Analysis() {
   const [selectedConversationId, setSelectedConversationId] = useState('')
 
   useEffect(() => {
-    // Load saves from localStorage
+    if (!isActive) return
+    // Reload saves from localStorage when switching to Analysis tab
     try {
       const stored = localStorage.getItem('playgroundSaves')
-      if (stored) {
-        const parsedSaves = JSON.parse(stored)
-        setSaves(parsedSaves.reverse()) // Most recent first
-      }
+      setSaves(stored ? JSON.parse(stored).reverse() : [])
     } catch (err) {
       console.error('Error loading saves:', err)
+      setSaves([])
     }
-  }, [])
+  }, [isActive])
 
   // Get unique template names from saves
   const templateNames = useMemo(() => {
@@ -81,6 +80,28 @@ function Analysis() {
     } catch {
       return timestamp
     }
+  }
+
+  // Format completions from output for display in <pre>
+  const formatCompletionsFromOutput = (output) => {
+    if (!output || output.completions === undefined) return null
+    const formatString = (str) => {
+      if (typeof str !== 'string') return str
+      return str
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\r/g, '\r')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+    }
+    const formatValue = (value) => {
+      if (value === null || value === undefined) return 'null'
+      if (typeof value === 'string') return formatString(value)
+      if (Array.isArray(value)) return value.map(item => formatString(String(item))).join('\n')
+      if (typeof value === 'object') return JSON.stringify(value, null, 2)
+      return String(value)
+    }
+    return formatValue(output.completions)
   }
 
   const handleDeleteSave = (index) => {
@@ -164,6 +185,109 @@ function Analysis() {
     setSelectedConversationId('')
     setSelectedSaves([])
     setSelectedSave(null)
+  }
+
+  // Single centralized run view: Completions (top) + Saved run info (bottom). Used in View All and Compare views.
+  const renderRunView = (save, { notesEditable = false, saveIndex = null } = {}) => {
+    if (!save) return null
+    return (
+      <>
+        <div className="run-completions-section">
+          <h4>Completions</h4>
+          {formatCompletionsFromOutput(save.output) != null ? (
+            <pre className="completions-text-view">{formatCompletionsFromOutput(save.output)}</pre>
+          ) : (
+            <p className="no-completions-message">No completions in output.</p>
+          )}
+        </div>
+        {renderSavedRunInfo(save, { notesEditable, saveIndex })}
+      </>
+    )
+  }
+
+  // Renders the "Saved run info" bottom section for a run (notes, template, subtemplates, email, request, output)
+  const renderSavedRunInfo = (save, { notesEditable = false, saveIndex = null } = {}) => {
+    if (!save) return null
+    return (
+    <div className="run-saved-info-section">
+      <h4>Saved run info</h4>
+      <div className="save-details-section notes-section">
+        <h5>Notes</h5>
+        {notesEditable && saveIndex !== null ? (
+          <textarea
+            className="save-notes-textarea"
+            value={save.notes || ''}
+            onChange={(e) => {
+              const updatedSaves = [...saves]
+              updatedSaves[saveIndex] = { ...updatedSaves[saveIndex], notes: e.target.value }
+              setSaves(updatedSaves)
+              localStorage.setItem('playgroundSaves', JSON.stringify([...updatedSaves].reverse()))
+            }}
+            placeholder="Add notes about this saved run..."
+            rows={4}
+          />
+        ) : (
+          <pre className="save-details-pre">{save.notes || '(No notes)'}</pre>
+        )}
+      </div>
+      <div className="save-details-section">
+        <h5>Template</h5>
+        <div className="save-details-field">
+          <strong>Save Name:</strong> {save.name || save.template?.name || 'N/A'}
+        </div>
+        <div className="save-details-field">
+          <strong>Template Name:</strong> {save.template?.name || 'N/A'}
+        </div>
+        <div className="save-details-field">
+          <strong>Content:</strong>
+          <pre className="save-details-pre">{save.template?.content || 'N/A'}</pre>
+        </div>
+        {save.template?.conditionFlags?.length > 0 && (
+          <div className="save-details-field">
+            <strong>Condition Flags:</strong>
+            <JsonView value={save.template.conditionFlags} />
+          </div>
+        )}
+        {save.template?.parametersValues && Object.keys(save.template.parametersValues || {}).length > 0 && (
+          <div className="save-details-field">
+            <strong>Parameter Values:</strong>
+            <JsonView value={save.template.parametersValues} />
+          </div>
+        )}
+      </div>
+      {Object.keys(save.subTemplates || {}).length > 0 && (
+        <div className="save-details-section">
+          <h5>SubTemplates</h5>
+          <JsonView value={save.subTemplates} />
+        </div>
+      )}
+      {save.emailDetails && (
+        <div className="save-details-section">
+          <h5>Email Details</h5>
+          <JsonView value={save.emailDetails} />
+        </div>
+      )}
+      <div className="save-details-section">
+        <h5>Experiment API Request</h5>
+        <div className="save-details-field">
+          <strong>URL:</strong> {save.experimentApiRequest?.url || 'N/A'}
+        </div>
+        <div className="save-details-field">
+          <strong>Method:</strong> {save.experimentApiRequest?.method || 'N/A'}
+        </div>
+        <div className="save-details-field">
+          <strong>Request Body:</strong>
+          <JsonView value={save.experimentApiRequest?.body || {}} />
+        </div>
+      </div>
+      {save.output && (
+        <div className="save-details-section">
+          <h5>Output (full JSON)</h5>
+          <JsonView value={save.output} />
+        </div>
+      )}
+    </div>
+  );
   }
 
   // Render default three-tile view
@@ -317,82 +441,9 @@ function Analysis() {
         </div>
         <div className="save-details">
           {selectedSave !== null && saves[selectedSave] ? (
-            <div className="save-details-content">
+            <div className="save-details-content run-details-two-section">
               <h3>Save Details</h3>
-              <div className="save-details-section notes-section">
-                <h4>Notes</h4>
-                <textarea
-                  className="save-notes-textarea"
-                  value={saves[selectedSave].notes || ''}
-                  onChange={(e) => {
-                    const updatedSaves = [...saves]
-                    updatedSaves[selectedSave] = {
-                      ...updatedSaves[selectedSave],
-                      notes: e.target.value
-                    }
-                    setSaves(updatedSaves)
-                    localStorage.setItem('playgroundSaves', JSON.stringify([...updatedSaves].reverse()))
-                  }}
-                  placeholder="Add notes about this saved run..."
-                  rows={4}
-                />
-              </div>
-              <div className="save-details-section">
-                <h4>Template</h4>
-                <div className="save-details-field">
-                  <strong>Save Name:</strong> {saves[selectedSave].name || saves[selectedSave].template?.name || 'N/A'}
-                </div>
-                <div className="save-details-field">
-                  <strong>Template Name:</strong> {saves[selectedSave].template?.name || 'N/A'}
-                </div>
-                <div className="save-details-field">
-                  <strong>Content:</strong>
-                  <pre className="save-details-pre">{saves[selectedSave].template?.content || 'N/A'}</pre>
-                </div>
-                {saves[selectedSave].template?.conditionFlags?.length > 0 && (
-                  <div className="save-details-field">
-                    <strong>Condition Flags:</strong>
-                    <JsonView value={saves[selectedSave].template.conditionFlags} />
-                  </div>
-                )}
-                {saves[selectedSave].template?.parametersValues && Object.keys(saves[selectedSave].template.parametersValues).length > 0 && (
-                  <div className="save-details-field">
-                    <strong>Parameter Values:</strong>
-                    <JsonView value={saves[selectedSave].template.parametersValues} />
-                  </div>
-                )}
-              </div>
-              {Object.keys(saves[selectedSave].subTemplates || {}).length > 0 && (
-                <div className="save-details-section">
-                  <h4>SubTemplates</h4>
-                  <JsonView value={saves[selectedSave].subTemplates} />
-                </div>
-              )}
-              {saves[selectedSave].emailDetails && (
-                <div className="save-details-section">
-                  <h4>Email Details</h4>
-                  <JsonView value={saves[selectedSave].emailDetails} />
-                </div>
-              )}
-              <div className="save-details-section">
-                <h4>Experiment API Request</h4>
-                <div className="save-details-field">
-                  <strong>URL:</strong> {saves[selectedSave].experimentApiRequest?.url || 'N/A'}
-                </div>
-                <div className="save-details-field">
-                  <strong>Method:</strong> {saves[selectedSave].experimentApiRequest?.method || 'N/A'}
-                </div>
-                <div className="save-details-field">
-                  <strong>Request Body:</strong>
-                  <JsonView value={saves[selectedSave].experimentApiRequest?.body || {}} />
-                </div>
-              </div>
-              {saves[selectedSave].output && (
-                <div className="save-details-section">
-                  <h4>Output</h4>
-                  <JsonView value={saves[selectedSave].output} />
-                </div>
-              )}
+              {renderRunView(saves[selectedSave], { notesEditable: true, saveIndex: selectedSave })}
             </div>
           ) : (
             <div className="no-selection-message">
@@ -511,58 +562,14 @@ function Analysis() {
               <div className="compare-details-container">
                 {selectedSaves.length > 0 ? (
                   <div className={`compare-details-grid ${layoutDirection === 'vertical' ? 'vertical-layout' : ''}`}>
-                    {selectedSaves.map((saveIndex, idx) => {
+                    {selectedSaves.map((saveIndex) => {
                       const save = saves[saveIndex]
                       if (!save) return null
                       return (
-                        <div key={saveIndex} className="compare-details-panel">
+                        <div key={saveIndex} className="compare-details-panel run-details-two-section">
                           <h4>{save.name || save.template?.name || 'Untitled'}</h4>
                           <div className="save-details-content">
-                            {save.emailDetails && (
-                              <div className="save-details-section">
-                                <h5>Email Details</h5>
-                                <JsonView value={save.emailDetails} />
-                              </div>
-                            )}
-                            {save.output && save.output.completions !== undefined && (
-                              <div className="save-details-section">
-                                <h5>Output Completions</h5>
-                                <pre className="completions-text-view">
-                                  {(() => {
-                                    const formatString = (str) => {
-                                      if (typeof str !== 'string') return str
-                                      return str
-                                        .replace(/\\n/g, '\n')
-                                        .replace(/\\t/g, '\t')
-                                        .replace(/\\r/g, '\r')
-                                        .replace(/\\"/g, '"')
-                                        .replace(/\\\\/g, '\\')
-                                    }
-                                    
-                                    const formatValue = (value) => {
-                                      if (value === null || value === undefined) {
-                                        return 'null'
-                                      }
-                                      if (typeof value === 'string') {
-                                        return formatString(value)
-                                      }
-                                      if (Array.isArray(value)) {
-                                        return value.map(item => formatString(String(item))).join('\n')
-                                      }
-                                      if (typeof value === 'object') {
-                                        return JSON.stringify(value, null, 2)
-                                      }
-                                      return String(value)
-                                    }
-                                    
-                                    return formatValue(save.output.completions)
-                                  })()}
-                                </pre>
-                              </div>
-                            )}
-                            {!save.emailDetails && (!save.output || !save.output.completions) && (
-                              <p>No data available</p>
-                            )}
+                            {renderRunView(save, { notesEditable: true, saveIndex })}
                           </div>
                         </div>
                       )
@@ -690,58 +697,14 @@ function Analysis() {
               <div className="compare-details-container">
                 {selectedSaves.length > 0 ? (
                   <div className={`compare-details-grid ${layoutDirection === 'vertical' ? 'vertical-layout' : ''}`}>
-                    {selectedSaves.map((saveIndex, idx) => {
+                    {selectedSaves.map((saveIndex) => {
                       const save = saves[saveIndex]
                       if (!save) return null
                       return (
-                        <div key={saveIndex} className="compare-details-panel">
+                        <div key={saveIndex} className="compare-details-panel run-details-two-section">
                           <h4>{save.name || save.template?.name || 'Untitled'}</h4>
                           <div className="save-details-content">
-                            {save.emailDetails && (
-                              <div className="save-details-section">
-                                <h5>Email Details</h5>
-                                <JsonView value={save.emailDetails} />
-                              </div>
-                            )}
-                            {save.output && save.output.completions !== undefined && (
-                              <div className="save-details-section">
-                                <h5>Output Completions</h5>
-                                <pre className="completions-text-view">
-                                  {(() => {
-                                    const formatString = (str) => {
-                                      if (typeof str !== 'string') return str
-                                      return str
-                                        .replace(/\\n/g, '\n')
-                                        .replace(/\\t/g, '\t')
-                                        .replace(/\\r/g, '\r')
-                                        .replace(/\\"/g, '"')
-                                        .replace(/\\\\/g, '\\')
-                                    }
-                                    
-                                    const formatValue = (value) => {
-                                      if (value === null || value === undefined) {
-                                        return 'null'
-                                      }
-                                      if (typeof value === 'string') {
-                                        return formatString(value)
-                                      }
-                                      if (Array.isArray(value)) {
-                                        return value.map(item => formatString(String(item))).join('\n')
-                                      }
-                                      if (typeof value === 'object') {
-                                        return JSON.stringify(value, null, 2)
-                                      }
-                                      return String(value)
-                                    }
-                                    
-                                    return formatValue(save.output.completions)
-                                  })()}
-                                </pre>
-                              </div>
-                            )}
-                            {!save.emailDetails && (!save.output || !save.output.completions) && (
-                              <p>No data available</p>
-                            )}
+                            {renderRunView(save, { notesEditable: true, saveIndex })}
                           </div>
                         </div>
                       )
