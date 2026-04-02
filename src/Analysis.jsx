@@ -9,6 +9,7 @@ function Analysis({ isActive }) {
   const [selectedSaves, setSelectedSaves] = useState([]) // For multi-select comparison
   const [renamingSave, setRenamingSave] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [copiedCompletionsKey, setCopiedCompletionsKey] = useState(null)
   const [showSavesList, setShowSavesList] = useState(true) // Collapsible saves list
   const [isLeftPaneCollapsed, setIsLeftPaneCollapsed] = useState(false) // Fully collapse left pane
   const [layoutDirection, setLayoutDirection] = useState('horizontal') // 'horizontal' or 'vertical' for comparison views
@@ -187,15 +188,53 @@ function Analysis({ isActive }) {
     setSelectedSave(null)
   }
 
+  const copyCompletionsToClipboard = async (text, copyKey) => {
+    if (!text) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedCompletionsKey(copyKey)
+      setTimeout(() => setCopiedCompletionsKey(null), 2000)
+    } catch (err) {
+      // Fallback for environments where clipboard API is unavailable
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      try {
+        document.execCommand('copy')
+        setCopiedCompletionsKey(copyKey)
+        setTimeout(() => setCopiedCompletionsKey(null), 2000)
+      } catch {
+        // If copy fails, do nothing (avoid alert spam in the UI)
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    }
+  }
+
   // Single centralized run view: Completions (top) + Saved run info (bottom). Used in View All and Compare views.
   const renderRunView = (save, { notesEditable = false, saveIndex = null } = {}) => {
     if (!save) return null
+    const completions = formatCompletionsFromOutput(save.output)
+    const copyKey = saveIndex !== null ? `run-${saveIndex}` : `run-${save.timestamp || save.name || 'unknown'}`
     return (
       <>
         <div className="run-completions-section">
-          <h4>Completions</h4>
-          {formatCompletionsFromOutput(save.output) != null ? (
-            <pre className="completions-text-view">{formatCompletionsFromOutput(save.output)}</pre>
+          <div className="completions-header-row">
+            <h4>Completions</h4>
+            {completions != null && (
+              <button
+                className="copy-completions-button"
+                onClick={() => copyCompletionsToClipboard(completions, copyKey)}
+                title="Copy completions to clipboard"
+              >
+                {copiedCompletionsKey === copyKey ? '✓ Copied' : 'Copy'}
+              </button>
+            )}
+          </div>
+          {completions != null ? (
+            <pre className="completions-text-view">{completions}</pre>
           ) : (
             <p className="no-completions-message">No completions in output.</p>
           )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { graphConfig } from './authConfig'
 import JsonView from '@uiw/react-json-view'
-import { singleValueExtendedProperties, fetchMessageDetails, processExtendedProperties, parseErrorResponse as parseErrorResponseUtil } from './messageUtils'
+import { singleValueExtendedProperties, fetchMessageDetails } from './messageUtils'
 import './Graph.css'
 
 function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavoritesChange, onTokenError }) {
@@ -279,8 +279,6 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
         const endpoint = folderId === 'Inbox' 
           ? `https://graph.microsoft.com/v1.0/me/messages?${inboxQueryParams.toString()}`
           : `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?${queryParams.toString()}`
-        
-        console.log('Fetching mailbox from:', endpoint)
         
         mailResponse = await fetch(
           endpoint,
@@ -601,7 +599,6 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
       // Fetch full email details from Microsoft Graph API using centralized function
       const emailData = await fetchMessageDetails(bearerToken, emailId)
       
-      console.log(`emailData: ${JSON.stringify(emailData, null, 2)}`)
       setEmailDetails(emailData)
 
       // Fetch all messages in the conversation thread
@@ -656,7 +653,6 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
             return dateA - dateB
           })
           
-          console.log(`filteredMessages: ${JSON.stringify(filteredMessages, null, 2)}`)
           // Fetch full details with uniqueBody for each message using centralized function
           const messageDetailsPromises = filteredMessages.map(async (msg) => {
             try {
@@ -667,7 +663,6 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
             }
           })
           const detailedMessages = await Promise.all(messageDetailsPromises)
-          console.log(`detailedMessages: ${JSON.stringify(detailedMessages, null, 2)}`)
           
           setEmailThread(detailedMessages)
         } else {
@@ -885,7 +880,7 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
                   onChange={(e) => setConversationIdInput(e.target.value)}
                   placeholder="Enter conversation ID..."
                   className="conversation-id-input"
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !fetchingByConversationId) {
                       fetchByConversationId()
                     }
@@ -897,7 +892,7 @@ function Graph({ bearerToken, onTokenSubmit, onLogout, onProfileChange, onFavori
                   onChange={(e) => setMessageIdInput(e.target.value)}
                   placeholder="Message ID (optional)..."
                   className="conversation-id-input message-id-input"
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !fetchingByConversationId) {
                       fetchByConversationId()
                     }

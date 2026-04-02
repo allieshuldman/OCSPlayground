@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { graphConfig } from './authConfig'
 import JsonView from '@uiw/react-json-view'
-import { fetchMessageDetails, parseErrorResponse as parseErrorResponseUtil } from './messageUtils'
+import { fetchMessageDetails } from './messageUtils'
 import './Playground.css'
 
 // Helper function to auto-resize a textarea element to fit content
@@ -72,6 +72,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     }
   })
   const [selectedTemplateName, setSelectedTemplateName] = useState('')
+  const [draftTemplateName, setDraftTemplateName] = useState('')
   const [templateText, setTemplateText] = useState('')
   const [subTemplates, setSubTemplates] = useState(() => {
     try {
@@ -109,6 +110,26 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   const [showSavedSubTemplates, setShowSavedSubTemplates] = useState(false)
   const [showSavePopup, setShowSavePopup] = useState(false)
   const [saveRunName, setSaveRunName] = useState('')
+  const usedMessageFetchIdRef = useRef(0)
+
+  const resetMessageDependentFields = () => {
+    setPlaceholderValues({})
+    setObjectKey('ConversationId')
+    setObjectValue('')
+    setShowUsedMessageDetails(false)
+    setCopiedMessageId(null)
+
+    setExperimentApiResponse(null)
+    setExperimentApiError(null)
+    setExperimentApiLoading(false)
+    setCopiedCurl(false)
+
+    try {
+      localStorage.removeItem('playgroundApiResponse')
+    } catch {
+      // ignore
+    }
+  }
   
   // Load favorite message IDs from localStorage
   const getFavoriteIds = () => {
@@ -312,8 +333,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     return String(value)
   }
 
-  const fetchUsedMessageDetails = async (messageId) => {
-    if (!bearerToken || !messageId || usedMessageDetailsLoading) return
+  const fetchUsedMessageDetails = async (messageId, fetchId) => {
+    if (!bearerToken || !messageId) return
 
     setUsedMessageDetailsLoading(true)
     setUsedMessageDetailsError(null)
@@ -324,9 +345,11 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     try {
       const emailData = await fetchMessageDetails(bearerToken, messageId, abortController.signal)
       clearTimeout(timeoutId)
+      if (usedMessageFetchIdRef.current !== fetchId) return
       setUsedMessageDetails(emailData)
     } catch (err) {
       clearTimeout(timeoutId)
+      if (usedMessageFetchIdRef.current !== fetchId) return
       if (err.name === 'AbortError') {
         setUsedMessageDetailsError('Request timed out. Please try again.')
       } else {
@@ -334,6 +357,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
         setUsedMessageDetailsError(err.message || 'Failed to fetch message details. Please try again.')
       }
     } finally {
+      if (usedMessageFetchIdRef.current !== fetchId) return
       setUsedMessageDetailsLoading(false)
     }
   }
@@ -347,16 +371,21 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       return
     }
     
+    // Clear all message-dependent UI and outputs before switching
+    resetMessageDependentFields()
+
+    // Invalidate any in-flight used-message detail fetch to prevent stale updates
+    const nextFetchId = usedMessageFetchIdRef.current + 1
+    usedMessageFetchIdRef.current = nextFetchId
+
     setUsedMessage(message)
     setUsedMessageDetails(null)
     setUsedMessageDetailsError(null)
-    fetchUsedMessageDetails(message.id)
+    fetchUsedMessageDetails(message.id, nextFetchId)
     
     // Auto-populate Object field with ConversationId if message has conversationId
-    if (message.conversationId) {
-      setObjectKey('ConversationId')
-      setObjectValue(message.conversationId)
-    }
+    setObjectKey('ConversationId')
+    setObjectValue(message.conversationId || '')
   }
 
   // Auto-populate Object field when usedMessageDetails is loaded (in case conversationId comes from details)
@@ -368,16 +397,18 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   }, [usedMessageDetails, usedMessage])
 
   const handleClearUsedMessage = () => {
+    usedMessageFetchIdRef.current += 1
+
+    resetMessageDependentFields()
+
     setUsedMessage(null)
     setUsedMessageDetails(null)
     setUsedMessageDetailsError(null)
-    setPlaceholderValues({}) // Clear all placeholder values (both regular and SubTemplate placeholders) when resetting used message
-    setObjectValue('') // Clear the Object field value when resetting used message
+    setUsedMessageDetailsLoading(false)
   }
 
   // Extract text between {{{ }}}, ignoring those containing #message or /message
   const extractPlaceholders = (text) => {
-    console.log(`text: ${text}`)
     const regex = /\{\{\{([^}]+)\}\}\}/g
     const matches = []
     let match
@@ -394,7 +425,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   }
 
   const extractPlaceholdersFromSubTemplate = (text) => {
-    console.log(`text: ${text}`)
     const regex = /\{\{([^}]+)\}\}/g
     const matches = []
     let match
@@ -460,7 +490,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
         }
       }
     })
-    console.log(subTemplatePlaceholdersMap) 
     return subTemplatePlaceholdersMap
   }, [subTemplateRefs, subTemplates])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -483,14 +512,12 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     if (lowerPlaceholder === 'from') {
       // Try from used message details first
       if (usedMessageDetails?.from?.emailAddress?.name) {
-        console.log(`usedMessageDetails.from.emailAddress.name: ${usedMessageDetails.from.emailAddress.name}`)
         return usedMessageDetails.from.emailAddress.name
       }
       // Try from favorite messages
       if (dashboardFavorites && dashboardFavorites.length > 0) {
         const mostRecentMessage = dashboardFavorites[0]
         if (mostRecentMessage.from?.emailAddress?.name) {
-          console.log(`mostRecentMessage.from.emailAddress.name: ${mostRecentMessage.from.emailAddress.name}`)
           return mostRecentMessage.from.emailAddress.name
         }
       }
@@ -501,13 +528,11 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     if (lowerPlaceholder === 'fromemail') {
       // Try from used message details first
       if (usedMessageDetails?.from?.emailAddress?.address) {
-        console.log(`usedMessageDetails.from.emailAddress.address: ${usedMessageDetails.from.emailAddress.address}`)
         return usedMessageDetails.from.emailAddress.address
       }
       // Try from favorite messages
       if (dashboardFavorites && dashboardFavorites.length > 0) {
         const mostRecentMessage = dashboardFavorites[0]
-        console.log(`mostRecentMessage: ${mostRecentMessage}`)
         if (mostRecentMessage.from?.emailAddress?.address) {
           return mostRecentMessage.from.emailAddress.address
         }
@@ -531,7 +556,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       }
       
       if (!userSmtp) {
-        console.log(`userSmtp: ${userSmtp}`)
         return 'No' // Can't determine without user SMTP
       }
       
@@ -546,7 +570,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
             const recipientEmail = recipient.emailAddress?.address?.toLowerCase()
             return recipientEmail === normalizedUserSmtp
           })
-          console.log(`inTo: ${inTo}`)
           if (inTo) return 'Yes'
         }
         
@@ -556,7 +579,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
             const recipientEmail = recipient.emailAddress?.address?.toLowerCase()
             return recipientEmail === normalizedUserSmtp
           })
-          console.log(`inCc: ${inCc}`)
           if (inCc) return 'Yes'
         }
       }
@@ -571,7 +593,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
             const recipientEmail = recipient.emailAddress?.address?.toLowerCase()
             return recipientEmail === normalizedUserSmtp
           })
-          console.log(`inTo: ${inTo}`)
           if (inTo) return 'Yes'
         }
         
@@ -581,11 +602,9 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
             const recipientEmail = recipient.emailAddress?.address?.toLowerCase()
             return recipientEmail === normalizedUserSmtp
           })
-          console.log(`inCc: ${inCc}`)
           if (inCc) return 'Yes'
         }
       }
-      console.log(`No`)
       return 'No'
     }
     
@@ -709,7 +728,8 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     textareas.forEach(textarea => autoResizeTextareaMaxLines(textarea, 10))
   }, [placeholderValues])
 
-  // Auto-populate placeholder values when placeholders, profile, favorites, or used message change
+  // Auto-populate placeholder values only when the "In Use" message details exist.
+  // This prevents stale placeholder values from lingering after the used message is changed/reset.
   useEffect(() => {
     const allPlaceholdersToResolve = [...placeholders]
     
@@ -720,10 +740,9 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       })
     })
     
-    if (allPlaceholdersToResolve.length > 0 && (dashboardProfile || dashboardFavorites?.length > 0 || usedMessageDetails)) {
-      setPlaceholderValues(prevValues => {
+    if (allPlaceholdersToResolve.length > 0 && usedMessageDetails) {
+      setPlaceholderValues(() => {
         const newValues = {}
-        let hasChanges = false
         
         // Always recalculate all placeholder values to ensure they update when message changes
         allPlaceholdersToResolve.forEach(fullPlaceholder => {
@@ -734,14 +753,13 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
           const resolvedValue = resolvePlaceholderValue(actualPlaceholder)
           // Always set the value, even if it's empty, to ensure updates when message changes
           newValues[fullPlaceholder] = resolvedValue || ''
-            if (resolvedValue) {
-              hasChanges = true
-          }
         })
         
         // Always return new values to ensure updates when dependencies change
         return newValues
       })
+    } else {
+      setPlaceholderValues(prevValues => (prevValues && Object.keys(prevValues).length > 0 ? {} : prevValues))
     }
   }, [placeholders, subTemplatePlaceholders, dashboardProfile, dashboardFavorites, usedMessageDetails, resolvePlaceholderValue])
 
@@ -774,6 +792,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       }
       saveTemplates(newTemplates)
       setSelectedTemplateName(fileName)
+      setDraftTemplateName(fileName)
       setTemplateText(content)
       setConditionFlags([])
       setParametersValues({})
@@ -788,6 +807,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   const handleStartManualTemplate = () => {
     setIsAddingTemplateManually(true)
     setSelectedTemplateName('')
+    setDraftTemplateName('')
     setTemplateText('')
     setConditionFlags([])
     setParametersValues({})
@@ -832,6 +852,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   const handleTemplateSelect = (e) => {
     const templateName = e.target.value
     setSelectedTemplateName(templateName)
+    setDraftTemplateName(templateName || '')
     if (templateName && templates[templateName]) {
       const template = templates[templateName]
       setTemplateText(template.content || '')
@@ -847,9 +868,9 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   }
 
   const handleSaveTemplateChanges = () => {
-    // Get template name from the name input field
-    const templateNameInput = document.querySelector('.selected-template-name-input')
-    const templateName = templateNameInput ? templateNameInput.value.trim() : selectedTemplateName
+    const templateName = isAddingTemplateManually
+      ? (selectedTemplateName || '').trim()
+      : (draftTemplateName || '').trim()
 
     if (!templateName) {
       alert('Please enter a template name')
@@ -861,23 +882,52 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       return
     }
 
+    const payload = {
+      content: templateText.trim(),
+      conditionFlags: conditionFlags,
+      parametersValues: parametersValues,
+      stopSequences: stopSequences
+    }
+
+    if (isAddingTemplateManually) {
+      const updatedTemplates = {
+        ...templates,
+        [templateName]: payload
+      }
+      saveTemplates(updatedTemplates)
+      setSelectedTemplateName(templateName)
+      setDraftTemplateName(templateName)
+      setIsAddingTemplateManually(false)
+      alert('Template saved successfully!')
+      return
+    }
+
+    if (!selectedTemplateName) {
+      alert('Select a template to edit, or use Add Template Manually')
+      return
+    }
+
+    if (templateName !== selectedTemplateName) {
+      if (templates[templateName]) {
+        alert('A template with this name already exists. Choose a different name to save as a new template.')
+        return
+      }
+      const updatedTemplates = {
+        ...templates,
+        [templateName]: payload
+      }
+      saveTemplates(updatedTemplates)
+      setSelectedTemplateName(templateName)
+      setDraftTemplateName(templateName)
+      alert('Saved as a new template. The original template was kept.')
+      return
+    }
+
     const updatedTemplates = {
       ...templates,
-      [templateName]: {
-        content: templateText.trim(),
-        conditionFlags: conditionFlags,
-        parametersValues: parametersValues,
-        stopSequences: stopSequences
-      }
+      [templateName]: payload
     }
     saveTemplates(updatedTemplates)
-    
-    // If we were adding manually, select the new template and exit manual mode
-    if (isAddingTemplateManually) {
-      setSelectedTemplateName(templateName)
-      setIsAddingTemplateManually(false)
-    }
-    
     alert('Template saved successfully!')
   }
 
@@ -901,18 +951,23 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       return
     }
 
-    // If name changed, update the key in templates object
+    const newKey = updatedSubTemplate.name
+    const oldKey = selectedSubTemplateName
     const newSubTemplates = { ...subTemplates }
-    if (selectedSubTemplateName !== updatedSubTemplate.name) {
-      // Name changed - remove old key and add new one
-      delete newSubTemplates[selectedSubTemplateName]
-      newSubTemplates[updatedSubTemplate.name] = updatedSubTemplate
-      setSelectedSubTemplateName(updatedSubTemplate.name)
-    } else {
-      // Name unchanged - just update the template
-      newSubTemplates[selectedSubTemplateName] = updatedSubTemplate
+
+    if (newKey !== oldKey) {
+      if (newSubTemplates[newKey]) {
+        alert('A subtemplate with this name already exists. Choose a different name to save as a new subtemplate.')
+        return
+      }
+      newSubTemplates[newKey] = updatedSubTemplate
+      saveSubTemplates(newSubTemplates)
+      setSelectedSubTemplateName(newKey)
+      alert('Saved as a new subtemplate. The original was kept.')
+      return
     }
 
+    newSubTemplates[oldKey] = updatedSubTemplate
     saveSubTemplates(newSubTemplates)
     alert('SubTemplate saved successfully!')
   }
@@ -1021,6 +1076,11 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
   const handleSubTemplateFieldChange = (field, value) => {
     if (!selectedSubTemplateName) return
 
+    if (field === 'name') {
+      setSubTemplateName(value)
+      return
+    }
+
     const updatedSubTemplate = {
       ...(subTemplates[selectedSubTemplateName] || {}),
       [field]: value
@@ -1032,9 +1092,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     }
     saveSubTemplates(newSubTemplates)
 
-    // Update local state
-    if (field === 'name') setSubTemplateName(value)
-    else if (field === 'sortOrder') setSubTemplateSortOrder(value)
+    if (field === 'sortOrder') setSubTemplateSortOrder(value)
     else if (field === 'inputType') setSubTemplateInputType(value)
     else if (field === 'segments') setSubTemplateSegments(value)
     else if (field === 'templateConditions') setSubTemplateConditions(value)
@@ -1180,12 +1238,10 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
 
     try {
       const experimentRequestBody = buildExperimentRequestBody()
-      console.log('Experiment API request body:', experimentRequestBody)
 
       // In Electron, CORS is bypassed via webSecurity: false
       // This fetch call will work without CORS restrictions
       const apiUrl = 'https://outlook-sdf.office.com/outlookcopilot/mailIntelligence/v2.0/experiment'
-      console.log('Calling Experiment API:', apiUrl)
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -1236,7 +1292,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
       setExperimentApiResponse(data)
       // Save to localStorage so it persists across page switches
       localStorage.setItem('playgroundApiResponse', JSON.stringify(data))
-      console.log('Experiment API response:', data)
     } catch (err) {
       console.error('Error calling Experiment API:', err)
       // For network errors or other exceptions, show the error message
@@ -1426,6 +1481,15 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
     }
   }, [selectedTemplateName, templates])
 
+  useEffect(() => {
+    if (isAddingTemplateManually) return
+    if (selectedTemplateName) {
+      setDraftTemplateName(selectedTemplateName)
+    } else {
+      setDraftTemplateName('')
+    }
+  }, [selectedTemplateName, isAddingTemplateManually])
+
   // Auto-resize output textboxes when response changes
   useEffect(() => {
     if (experimentApiResponse) {
@@ -1535,7 +1599,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                   onClick={() => setShowUsedMessageDetails(!showUsedMessageDetails)}
                 >
                   <h3>Message Details for Selected Message</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="used-message-details-header-actions">
                     <span className="used-message-details-toggle">
                       {showUsedMessageDetails ? '▼' : '▶'}
                     </span>
@@ -1563,7 +1627,6 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                 {usedMessageDetails && (
                   <div className="used-message-data">
                     {Object.entries(usedMessageDetails).map(([key, value]) => {
-                          console.log(`usedMessageDetails key: ${key} value: ${value}`)
                       // Skip body and uniqueBody as they're displayed separately
                       if (key === 'body' || key === 'uniqueBody') return null
                           
@@ -1574,7 +1637,9 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                           <div className="used-message-key">{key}</div>
                               <div className="used-message-value">
                                 {isJson ? (
-                                  <JsonView value={getJsonValue(value)} style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px' }} />
+                                  <div className="used-message-json-wrap">
+                                    <JsonView value={getJsonValue(value)} style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px' }} />
+                                  </div>
                                 ) : (
                                   formatValue(value)
                                 )}
@@ -2055,6 +2120,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                 </div>
               )}
                   </div>
+                  <div className="section-divider section-divider-large" aria-hidden="true" />
                   {/* Template Header */}
             <div className="template-section-header">
               <h2>Template</h2>
@@ -2150,12 +2216,20 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
             <input
                   type="text"
                   className="selected-template-name-input"
-                  value={selectedTemplateName || ''}
-                  readOnly={!isAddingTemplateManually}
-                  placeholder={isAddingTemplateManually ? "Enter template name..." : "No template selected"}
+                  value={isAddingTemplateManually ? (selectedTemplateName || '') : draftTemplateName}
+                  readOnly={!isAddingTemplateManually && !selectedTemplateName}
+                  placeholder={
+                    isAddingTemplateManually
+                      ? 'Enter template name...'
+                      : selectedTemplateName
+                        ? 'Template name (change to save as a new template)'
+                        : 'No template selected'
+                  }
                   onChange={(e) => {
                     if (isAddingTemplateManually) {
                       setSelectedTemplateName(e.target.value)
+                    } else if (selectedTemplateName) {
+                      setDraftTemplateName(e.target.value)
                     }
                   }}
                 />
@@ -2434,6 +2508,7 @@ function Playground({ bearerToken, ocsToken, dashboardProfile, dashboardFavorite
                     onClick={() => {
                       setIsAddingTemplateManually(false)
                       setSelectedTemplateName('')
+                      setDraftTemplateName('')
                       setTemplateText('')
                       setConditionFlags([])
                       setParametersValues({})

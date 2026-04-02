@@ -532,6 +532,38 @@
   color: #1a1a1a;
 }
 
+.completions-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.copy-completions-button {
+  padding: 6px 12px;
+  background-color: #f3f2f1;
+  color: #1a1a1a;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background-color 0.2s;
+  white-space: nowrap;
+}
+
+.copy-completions-button:hover:not(:disabled) {
+  border-color: #0078d4;
+  color: #0078d4;
+  background-color: #ffffff;
+}
+
+.copy-completions-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .run-saved-info-section {
   margin-top: 8px;
 }

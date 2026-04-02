@@ -74,20 +74,22 @@ function App() {
   return (
     <div className="App">
       {/* Hamburger Menu Button */}
-      {/* <button 
+      <button
         className="hamburger-menu-button"
         onClick={toggleSidebar}
-        aria-label="Toggle menu"
+        aria-label="Toggle navigation menu"
+        aria-expanded={sidebarOpen}
+        aria-controls="side-panel"
       >
         <span className={`hamburger-icon ${sidebarOpen ? 'open' : ''}`}>
           <span></span>
           <span></span>
           <span></span>
         </span>
-      </button> */}
+      </button>
 
       {/* Side Panel */}
-      <div className={`side-panel ${sidebarOpen ? 'open' : 'closed'}`}>
+      <div id="side-panel" className={`side-panel ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="side-panel-header">
           <h2>OCS Playground</h2>
         </div>
